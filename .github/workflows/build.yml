@@ -1,0 +1,27 @@
+name: Compilar APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: full-rendimiento
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Compilar full-rendimiento.apk
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk full-rendimiento.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-rendimiento
+          path: full-rendimiento/full-rendimiento.apk
