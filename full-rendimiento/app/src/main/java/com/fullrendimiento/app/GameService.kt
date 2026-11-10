@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -60,6 +62,7 @@ class GameService : Service() {
     private var monitor: Job? = null
     private var gameName = ""
     private var hotWarned = false
+    private var lastPing: Int? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -114,6 +117,7 @@ class GameService : Service() {
             delay(3000)
             waited += 3
             val temp = batteryTemp(this)
+            lastPing = Net.quickPing()
             update(text(temp))
             if (temp != null && temp >= 42f && !hotWarned) {
                 hotWarned = true
@@ -121,20 +125,44 @@ class GameService : Service() {
             } else if (temp != null && temp < 39f) {
                 hotWarned = false
             }
-            if (!Shell.ready) continue
-            val running = Shell.run("pidof $pkg").out.isNotBlank()
+            // Con Shizuku: ¿sigue vivo el proceso? Sin Shizuku: ¿esta el juego en pantalla?
+            val viaShell = Shell.ready
+            val running: Boolean = when {
+                viaShell -> Shell.run("pidof $pkg").out.isNotBlank()
+                Priv.hasUsageAccess(this) -> foregroundApp() == pkg
+                else -> continue
+            }
             when {
                 running -> { seen = true; missing = 0 }
                 seen -> missing++
-                waited > 120 -> missing = 2 // el juego nunca se abrio
+                waited > 120 -> missing = 99 // el juego nunca se abrio
             }
-            if (missing >= 2) {
+            // Sin Shizuku se espera mas (~30 s) para no restaurar si solo cambiaste de app un momento
+            if (missing >= (if (viaShell) 2 else 10)) {
                 Optimizer.restore(this)
-                alert("✅ Juego cerrado", "Todo volvió a la normalidad.")
+                if (Optimizer.pendingRestore(this)) {
+                    alert("⚠️ Falta restaurar algo", "Activa Shizuku y abre Full Rendimiento para terminar.")
+                } else {
+                    alert("✅ Juego cerrado", "Todo volvió a la normalidad.")
+                }
                 finish()
                 return
             }
         }
+    }
+
+    /** App que esta en pantalla ahora (requiere acceso de uso). */
+    private fun foregroundApp(): String? {
+        val usm = getSystemService(UsageStatsManager::class.java) ?: return null
+        val now = System.currentTimeMillis()
+        val events = usm.queryEvents(now - 60 * 60 * 1000L, now)
+        val e = UsageEvents.Event()
+        var last: String? = null
+        while (events.hasNextEvent()) {
+            events.getNextEvent(e)
+            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) last = e.packageName
+        }
+        return last
     }
 
     private fun finish() {
@@ -143,7 +171,8 @@ class GameService : Service() {
     }
 
     private fun text(temp: Float?): String =
-        "$gameName · " + (temp?.let { "${it.toInt()}°C" } ?: "temperatura —")
+        "$gameName · " + (temp?.let { "${it.toInt()}°C" } ?: "—°C") +
+            " · ping " + (lastPing?.let { "$it ms" } ?: "—")
 
     private fun build(content: String): Notification {
         val open = PendingIntent.getActivity(

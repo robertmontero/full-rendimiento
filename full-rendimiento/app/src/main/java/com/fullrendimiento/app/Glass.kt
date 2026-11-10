@@ -151,9 +151,12 @@ fun GlassSwitch(checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -
 
 /** Fila de una optimizacion: icono, texto e interruptor. */
 @Composable
-fun OptionRow(emoji: String, title: String, sub: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+fun OptionRow(
+    emoji: String, title: String, sub: String, checked: Boolean, enabled: Boolean,
+    badge: String? = null, onChange: (Boolean) -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 9.dp),
+        Modifier.fillMaxWidth().padding(vertical = 9.dp).alpha(if (badge != null) 0.75f else 1f),
         verticalAlignment = Alignment.CenterVertically
     ) {
         EmojiBubble(emoji)
@@ -161,9 +164,19 @@ fun OptionRow(emoji: String, title: String, sub: String, checked: Boolean, enabl
         Column(Modifier.weight(1f)) {
             Text(title, color = TextMain, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Sub(sub, size = 12)
+            if (badge != null) Text("🔒 $badge", color = Warn, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.width(10.dp))
-        GlassSwitch(checked, enabled, onChange)
+        GlassSwitch(checked && badge == null, enabled && badge == null, onChange)
+    }
+}
+
+/** Fila de dato: etiqueta a la izquierda, valor a la derecha. */
+@Composable
+fun InfoRow(label: String, value: String, color: Color = TextMain) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = TextFaint, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
