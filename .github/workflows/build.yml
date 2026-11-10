@@ -20,8 +20,10 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/app-release.apk full-rendimiento.apk
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          cp app/build/outputs/apk/release/app-release.apk full-rendimiento-v$VERSION.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: full-rendimiento
-          path: full-rendimiento/full-rendimiento.apk
+          name: full-rendimiento-v${{ env.VERSION }}
+          path: full-rendimiento/full-rendimiento-v*.apk
